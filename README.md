@@ -1,1 +1,1 @@
-# rosetta_tetc_cs
+# ROSETTA: RNN inference processor based on programmable data formats and dynamic activation pruning
