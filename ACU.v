@@ -1,8 +1,33 @@
-/**
-*   @Module ACU: Activation Coefficient Unit
-*   @brief  Activation Coefficient Unit based on the reduced table
-*  
-**/
+module ACU (
+    input    wire [(64*8)-1:0]     in,
+    output   wire [(64*8)-1:0]     sig_out,
+    output   wire [(64*8)-1:0]     tanh_out,
+    output   wire [(64*8)-1:0]     sig_slope,
+    output   wire [(64*8)-1:0]     sig_offset,
+    output   wire [(64*8)-1:0]     tanh_slope,
+    output   wire [(64*8)-1:0]     tanh_offset
+	);
+
+generate
+    genvar idx;
+        for(idx = 0; idx < 64; idx = idx+1) begin : actblk
+            sig_slope u0_sig_slope(
+                .in_data(in[8*(idx+1)-1:8*idx]),
+                .slope(sig_slope[8*(idx+1)-1:8*idx])
+            );        
+            sig_offset u0_sig_offset(
+                .in_data(in[8*(idx+1)-1:8*idx]),
+                .offset(sig_offset[8*(idx+1)-1:8*idx]) 
+            );
+            assign tanh_slope[8*(idx+1)-1:8*idx] = sig_slope[8*(idx+1)-1:8*idx];
+            assign tanh_offset[8*(idx+1)-1:8*idx] = {{{(3){~sig_offset[8*idx+4]}}, sig_offset[8*idx+3:8*idx]}, 1'd0};
+            assign sig_out[8*(idx+1)-1:8*idx]  = {{(3){1'b0}}, in[8*idx+4:8*idx]};
+            assign tanh_out[8*(idx+1)-1:8*idx] = {{(2){1'b0}}, {in[8*idx+3:8*idx], 2'b0}};
+        end 
+endgenerate
+
+endmodule
+
 module sig_slope (
     input   wire    [7:0]  in_data,
     input   wire           enof_type,

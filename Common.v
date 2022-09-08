@@ -75,7 +75,7 @@ module Single_Port_SRAM #(
 )(
         input   wire    [ADDR_WIDTH-1:0]                       address,
         input   wire    [NUM_BYTE_IN_WORD-1:0]                 byteena,         //active-high byte enable
-        // input 	wire                                           clken, 
+        input 	wire                                           clken, 
         input   wire                                           clock,
         input   wire    [BYTE*NUM_BYTE_IN_WORD-1:0]            data,
         input   wire                                           rden,
@@ -87,7 +87,7 @@ reg     [BYTE*NUM_BYTE_IN_WORD-1:0]     mem [0:DEPTH-1];
 reg     [ADDR_WIDTH-1:0]                reg_address;
 
 always @(posedge clock)
-        if(rden & ~wren) q <=  mem[address];               //registering read address
+        if(clken & rden & (~wren)) q <=  mem[address];               //registering read address
 
 wire    [BYTE*NUM_BYTE_IN_WORD-1:0]     biten;
 
@@ -99,7 +99,7 @@ generate
 endgenerate
 
 always @(posedge clock)
-        if(~rden & wren) mem[address] <=   (data & biten) | (mem[address] & ~biten);
+        if(clken & (~rden) & wren) mem[address] <=   (data & biten) | (mem[address] & ~biten);
 
 endmodule
 
@@ -117,25 +117,25 @@ module Dual_Port_SRAM #(
         input   wire                                           clock,
         input   wire    [BYTE*NUM_BYTE_IN_WORD-1:0]            data_a,
         input   wire    [BYTE*NUM_BYTE_IN_WORD-1:0]            data_b,
-        // input   wire                                           enable,
+        input   wire                                           enable,
         input   wire                                           wren_a,          //write=1, read=0
         input   wire                                           wren_b,          //write=1, read=0
         output  reg     [BYTE*NUM_BYTE_IN_WORD-1:0]            q_a,
         output  reg     [BYTE*NUM_BYTE_IN_WORD-1:0]            q_b
-
+ 
 );
 
 reg     [BYTE-1:0]     mem     [0:DEPTH-1];
 
 always @(posedge clock)
-        if(~wren_a) q_a <=  mem[address_a]; //port_a read
+        if(enable & (~wren_a)) q_a <=  mem[address_a]; //port_a read
 
 always @(posedge clock)
-        if(~wren_b) q_b <=  mem[address_b]; //port_b read
+        if(enable & (~wren_b)) q_b <=  mem[address_b]; //port_b read
 
 always @(posedge clock) begin
-        if(wren_a) mem[address_a] <= (data_a); //write
-        if(wren_b) mem[address_b] <= (data_b);
+        if(enable & wren_a) mem[address_a] <= (data_a); //write
+        if(enable & wren_b) mem[address_b] <= (data_b);
 end
 
 endmodule
@@ -150,10 +150,10 @@ module PAM(
     input wire we,
     input wire [7:0] be,
 
-    input wire [3:0] raddr0,
-    input wire [3:0] raddr1,
-    input wire [3:0] raddr2,
-    input wire [3:0] waddr,
+    input wire [4:0] raddr0,
+    input wire [4:0] raddr1,
+    input wire [4:0] raddr2,
+    input wire [4:0] waddr,
 
     output reg [63:0] rdata0,
     output reg [63:0] rdata1,
@@ -165,7 +165,7 @@ module PAM(
 );
 
 //64bit x 14
-reg [63:0] mem[0:13];
+reg [63:0] mem[0:15];
 
 wire [63:0] biten = {{8{be[7]}}, {8{be[6]}}, {8{be[5]}}, {8{be[4]}},
                      {8{be[3]}}, {8{be[2]}}, {8{be[1]}}, {8{be[0]}}};

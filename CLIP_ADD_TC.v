@@ -1,4 +1,4 @@
-module ADD_TC #(
+module CLIP_ADD_TC #(
 		parameter W = 8
 	)(
 	input 	wire [31:0]  in1,

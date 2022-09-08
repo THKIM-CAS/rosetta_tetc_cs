@@ -1,107 +1,91 @@
-/**
-*   @Module    ROSETTA_Controller
-*   @brief     Generating control signals of ROSETTA_Core
-*
-**/
 module ROSETTA_Controller(
-        input   wire    [27:0]  inst,
-
+        input   wire    [31:0]  inst,
+  
+        input   wire            nops_cntr_we,                    // first cycle of the instruction
+        input   wire            beta_last_bound,
+        input   wire            beta_done,                      // 
+        input   wire            alp_plus_beta_last_bound,             // end of matrix P_row
+        input   wire            alp_plus_beta_done,             // end of matrix P_row
+        input   wire            p_done,                         // end of matrix P_row x
+        input   wire            p_last_bound,               // one cycle left before p done
+        input   wire            nops_done,
         input   wire            all_done,
 
-        input   wire            nop,
-        output  wire            nops_encod,
+        output  wire            x_addr_rst, 
+        output  wire            r_addr_rst,
+        output  wire            x_addr_wen, 
+        output  wire            r_addr_wen,
 
-        input   wire            k_end,
-        input   wire            i_end,                          // end of matrix P_row x P_col
-        input   wire            j_end,                          // end of matrix P_row x all_col
-        input   wire            j_end_reg,                      
-
-        input   wire            e_end,                          // end of EMAC or ENOF
-        output  wire            k_end_out,
-        output  wire            i_end_out,                      
-        output  wire            j_end_out,
-        output  wire            e_state,
-        output  wire            e_end_out,
-
-        input   wire            stall_done,                     // done bubble
-        output  wire            stall_fetch,                    
-
-        output  wire            am_src0_ren,                    // am src0 read enable
-        output  wire            am_src1_ren,                    // am src1 read enable
-        output  wire            am_dst_ren,                     // am src2 read enable
-        output  wire            am_dst_wen,                     // am dst  write enable
+        output  wire            im_ren,                         // stall fetch
+        output  wire            pam_x_ren,                      // pam x read enable
+        output  wire            pam_y_ren,                      // pam y read enable
+        output  wire            pam_r_ren,                      // pam r read enable
+        output  wire            pam_r_wen,                      // pam r write enable
         output  wire            wm_ren,                         // wm read enable
         output  wire            bm_ren,                         // bm read enable
 
-        output  wire    [1:0]   oprnd1_sel,                     
-        output  wire            oprnd2_sel,                     
-        output  wire            mvma_first,                     // mvma first signal
-
-        output  wire            done_wen,                       // Done signal write enable
-
-        output  wire            inv,                            // Implementing (1-x) of GRU (if x<0, invert fraction bits)
-        output  wire            acc,                            // MAC operation Accumulation enable (y = x + ( acc ? a : 0 ))
-        output  wire            act_type,                       // activation type (0-sigmoid, 1-tanh)
-        output  wire    [1:0]   fp_out,
-        output  wire    [1:0]   fp_in0,
-        output  wire    [1:0]   fp_in1,
-        output  wire            last_inst
-
+        output  wire            inst_done                       // single instruction done signal
 );
 
-/*
-* Instruction based Control signals
-*
-* inv:      inversion       (0-off    , 1-on)           // for GRU (1-x)
-* acc:      accumulate      (0-off    , 1-on)
-* act_type: activation type (0-sigmoid, 1-tanh)
-*/
-assign nops_encod       = inst[1]; //2'd3 : 3'b0
-assign last_inst        = inst[2];
-assign fp_in1           = inst[4:3];
-assign fp_in0           = inst[6:5];
-assign fp_out           = inst[8:7];
-assign inv              = inst[11];
-assign acc              = inst[12];
-assign act_type         = inst[13];
-assign k_end_out        = k_end;
-assign i_end_out        = i_end;
-assign j_end_out        = j_end;
-assign e_end_out        = e_end;
+reg     [11:0]  ctrl_sig; 
 
-reg     [12:0]  ctrl_sig;
-/*
-* Control signals
-* 
-* Total 12bit control signals
-* 
-*/
-
-assign  {stall_fetch,
-        e_state,
-        am_src0_ren, am_src1_ren, am_dst_ren, am_dst_wen, wm_ren, bm_ren, 
-        oprnd1_sel, oprnd2_sel, mvma_first,
-        done_wen}
+assign  {im_ren,
+        pam_x_ren, pam_y_ren, pam_r_ren, pam_r_wen,
+        wm_ren, bm_ren,
+        x_addr_wen, r_addr_wen, 
+        x_addr_rst, r_addr_rst, 
+        inst_done}
         = ctrl_sig;
 
 always @*
-        casex({all_done, nop, stall_done, inst[15], inst[0], j_end, j_end_reg, i_end, e_end})
+        casex({inst[16], inst[0], beta_last_bound, beta_done, alp_plus_beta_last_bound, alp_plus_beta_done, p_last_bound, p_done, inst[1], nops_cntr_we, nops_done, all_done})
 
-                9'b0_10_x0_x1x_x: ctrl_sig = 13'b1_0_000000_0000_0;                                         // NOP (delayed slot)
-                9'b0_11_00_x1x_x: ctrl_sig = 13'b0_0_000000_0000_1;                                         // NOP + stall done
+            12'bx0_10_00_11_100_0: ctrl_sig = 12'b0_1000_11_10_00_0;
+            12'bx0_xx_01_11_100_0: ctrl_sig = 12'b0_1000_11_10_00_0;
+            12'bx0_10_10_11_100_0: ctrl_sig = 12'b0_1001_11_01_10_0;
+            12'bx0_01_00_11_100_0: ctrl_sig = 12'b0_1000_11_10_00_0;
+            12'bx0_01_10_11_100_0: ctrl_sig = 12'b0_1001_11_00_00_1;
 
-                9'b0_00_x0_0x0_x: ctrl_sig = 13'b1_0_100011_0000_0;                                         // mvma k_done
-                9'b0_00_x0_0x1_x: ctrl_sig = 13'b1_0_100011_0001_0;                                         // mvma i_done
-                9'b0_00_x0_1xx_x: ctrl_sig = 13'b1_0_000000_0000_1;                                         // mvma j_done
+            12'bx0_xx_xx_00_100_0: ctrl_sig = 12'b0_0000_11_00_00_0;
+            12'bx0_10_01_10_100_0: ctrl_sig = 12'b0_0001_11_01_00_0;
+            12'bx0_10_01_01_100_0: ctrl_sig = 12'b0_1000_11_10_00_0;
+            12'bx0_10_10_10_100_0: ctrl_sig = 12'b0_0000_11_00_00_0;
+            12'bx0_01_01_10_100_0: ctrl_sig = 12'b0_0001_11_01_00_1;
+            12'bx0_01_10_10_100_0: ctrl_sig = 12'b0_0000_11_00_00_0;
+            12'bx0_xx_10_01_100_0: ctrl_sig = 12'b0_1000_11_00_10_0;
+            12'bx0_01_01_01_100_0: ctrl_sig = 12'b0_1000_11_00_00_0;
+            12'bx0_xx_xx_xx_110_0: ctrl_sig = 12'b0_0000_11_00_11_0;
+            12'bx0_xx_xx_xx_111_0: ctrl_sig = 12'b1_0000_00_00_11_0;
 
-                9'b0_00_11_xxx_0: ctrl_sig = 13'b1_1_100100_1010_0;                                         // enof start
-                9'b0_00_11_xxx_1: ctrl_sig = 13'b1_0_100100_1010_1;                                         // enof done
+            12'bx0_10_00_10_100_0: ctrl_sig = 12'b0_0000_11_00_00_0;
+            12'bx0_10_00_01_100_0: ctrl_sig = 12'b0_1000_11_10_00_0;
 
-                9'b0_0x_01_xxx_0: ctrl_sig = acc ? 13'b1_1_111100_0100_0 : 13'b1_1_110100_0100_0;             // emac start
-                9'b0_0x_01_xxx_1: ctrl_sig = acc ? 13'b1_0_111100_0100_1 : 13'b1_0_110100_0100_1;             // emac done
+            12'bx0_01_00_10_100_0: ctrl_sig = 12'b0_0000_11_00_00_0;
+            12'bx0_01_00_01_100_0: ctrl_sig = 12'b0_1000_11_10_00_0;
 
-                9'b1_xx_xx_xxx_x: ctrl_sig = 13'b1_0_000000_0000_0;
+            // ENOF w/ nops         
+            12'b11_x0_xx_xx_100_0: ctrl_sig = 12'b0_1001_00_11_00_0;
+            12'b11_01_xx_xx_100_0: ctrl_sig = 12'b0_1001_00_00_11_1;
+            12'b11_xx_xx_xx_110_0: ctrl_sig = 12'b0_0000_00_00_11_0;
+            12'b11_xx_xx_xx_111_0: ctrl_sig = 12'b1_0000_00_00_00_0;
+            // ENOF w/o nops
+            12'b11_x0_xx_xx_0xx_0: ctrl_sig = 12'b0_1001_00_11_00_0;
+            12'b11_01_xx_xx_0xx_0: ctrl_sig = 12'b1_1001_00_00_11_1;
 
-                default:    ctrl_sig = 13'd0;
+            // EMAC w/ nops
+            12'b01_x0_xx_xx_100_0: ctrl_sig = 12'b0_1111_00_11_00_0;
+            12'b01_01_xx_xx_100_0: ctrl_sig = 12'b0_1111_00_00_11_1;
+            12'b01_xx_xx_xx_110_0: ctrl_sig = 12'b0_0000_00_00_11_0;
+            12'b01_xx_xx_xx_111_0: ctrl_sig = 12'b1_0000_00_00_00_0;
+            // EMAC w/o nops
+            12'b01_x0_xx_xx_0xx_0: ctrl_sig = 12'b0_1111_00_11_00_0;
+            12'b01_01_xx_xx_0xx_0: ctrl_sig = 12'b1_1111_00_00_11_1;
+            
+            // all done
+            12'bxx_xx_xx_xx_xxx_1: ctrl_sig = 12'b0_0000_00_00_00_0;
+
+            default    : ctrl_sig = 12'd0;       // done of ENOF
+
         endcase
-endmodule
+
+endmodule 

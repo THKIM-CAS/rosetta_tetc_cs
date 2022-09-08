@@ -1,6 +1,6 @@
 /**
 *   @Module ROSETTA State Machine
-*   @brief  Change ROSETTA status by start & done signals
+*   @brief  Change ARTEMIS status by start & done signals
 *   
 **/
 module ROSETTA_State_Machine (
