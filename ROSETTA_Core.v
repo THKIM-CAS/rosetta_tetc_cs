@@ -330,9 +330,9 @@ assign am_x_raddr = {1'b0, ZB_pam_x_raddr};
 assign raccess_xy = ((!ZB_inst[16]) & ZB_inst[0]) ? (pam_x_rdata & pam_y_rdata) : pam_x_rdata;
 assign raccess_z  = pam_r_rdata;
 
-assign am_x_rcs = {(64){1'b1}};
-assign am_y_rcs = {(64){1'b1}};
-assign am_r_rcs = {(64){1'b1}};
+assign am_x_rcs = raccess_xy;
+assign am_y_rcs = raccess_xy;
+assign am_r_rcs = raccess_z;
 
 assign bm_raddr = ZB_inst[21:17] + bias_cntr_inc; // base_z + bias increment value (DA stage's r_raddr_cntr)
 assign wm_raddr = (ZB_inst[16:11] << 3'd6) + ((x_addr_up << 3'd6) + (r_addr_up * 11'd192)) + (((p_done & p_last_bound) ? (wght_addr_cntr_rdata) : lzcu_in_sel ? (wght_addr_cntr_rdata + lzcu_out) : (wght_addr_cntr_rdata + lzcu_out + 1'd1)));
